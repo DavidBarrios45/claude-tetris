@@ -1,0 +1,122 @@
+name: Claude Issue Triage
+
+on:
+  issues:
+    types: [opened, edited, reopened]
+
+concurrency:
+  group: triage-${{ github.event.issue.number }}
+  cancel-in-progress: true
+
+jobs:
+  triage:
+    # No procesar issues abiertos/editados por bots (evita bucles) ni los que ya
+    # mencionan @claude en el body (esos los maneja claude.yml).
+    if: |
+      github.event.sender.type != 'Bot' &&
+      !contains(github.event.issue.body, '@claude')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+      id-token: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Ensure project labels exist
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash .github/scripts/ensure-labels.sh
+
+      - name: Run Claude Code triage
+        id: claude-triage
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          claude_args: >-
+            --allowed-tools "Bash(gh issue view:*),Bash(gh issue edit:*),Bash(gh issue comment:*),Bash(gh api:*),Read,Grep,Glob"
+          prompt: |
+            Eres un triager técnico para el repo de Tetris ${{ github.repository }}, issue #${{ github.event.issue.number }}.
+
+            ## Contexto del proyecto
+            Tetris clásico en JavaScript vanilla + HTML5 Canvas + CSS, sin build tools ni dependencias.
+            Tres archivos: `index.html` (DOM/canvas), `style.css` (tema), `game.js` (~300 líneas,
+            todo en scope global compartido, sin módulos). Puntos clave de `game.js`:
+            - `board`: matriz ROWS×COLS, 0 = vacío, 1-7 = índice de color. `PIECES` define las 7
+              piezas, `COLORS` mapea índice a color hex.
+            - `rotateCW` transpone + invierte filas. `tryRotate` aplica la rotación y prueba wall
+              kicks con offsets `[0, -1, 1, -2, 2]` hasta que uno no colisione.
+            - `collide(shape, ox, oy)` es la única fuente de verdad para validar movimiento y rotación
+              (límites del tablero + solapamiento con celdas fijas).
+            - `loop(ts)` corre en `requestAnimationFrame`, acumula `dropAccum` y baja la pieza al
+              superar `dropInterval`; al colisionar abajo llama `lockPiece()` (merge → clearLines → spawn).
+            - Scoring: `LINE_SCORES = [0,100,300,500,800]` × `level`; hard drop = 2 pts/celda, soft
+              drop = 1 pt/fila. `level` sube cada 10 líneas; `dropInterval = max(100, 1000 - (level-1)*90)`.
+            - `ghostY()` proyecta `current` hacia abajo con `collide`; se dibuja con `globalAlpha = 0.2`.
+            - Estado mutable a nivel de módulo (`board, current, next, score, lines, level, paused,
+              gameOver, ...`) se resetea en `init()` y se muta directo desde el input handler y el loop.
+
+            ## Tarea
+
+            1. Lee el issue completo, incluyendo comentarios previos:
+               `gh issue view ${{ github.event.issue.number }} --json title,body,labels,comments`
+            2. Explora el código real del repo (`game.js`, `index.html`, `style.css`) con Read/Grep/Glob
+               para localizar con precisión la función y línea relevantes al issue. No asumas: verifica
+               contra el código actual, no solo contra este resumen.
+            3. Aplica labels con `gh issue edit ${{ github.event.issue.number }} --add-label "..."`.
+               Reglas estrictas:
+               - Usa SOLO labels de esta lista, nunca inventes otras:
+                 `bug`, `enhancement`, `documentation`, `question`, `duplicate`, `good first issue`,
+                 `help wanted`, `invalid`, `wontfix`,
+                 `area:gameplay`, `area:ui`, `area:scoring`, `area:input`,
+                 `priority:high`, `priority:medium`, `priority:low`,
+                 `complexity:small`, `complexity:medium`, `complexity:large`.
+               - Exactamente un label de tipo (`bug`/`enhancement`/`documentation`/`question`) salvo
+                 que el issue sea claramente inválido/duplicado.
+               - Al menos un `area:*` cuando aplique al código de `game.js`.
+               - Exactamente un `priority:*` y un `complexity:*`.
+               - Usa solo `--add-label`. Nunca quites labels que ya haya puesto una persona.
+            4. Publica el diagnóstico como comentario usando este formato exacto (en español), siempre
+               empezando con el marcador HTML literal en la primera línea:
+
+               ```
+               <!-- claude-triage -->
+               ## Diagnóstico automático
+
+               **Tipo**: bug | mejora | documentación | pregunta
+               **Resumen**: 1-2 frases de qué pide realmente el issue.
+
+               ### Zona del código afectada
+               - `game.js:<línea>` — `<función>` — por qué es relevante
+
+               ### Causa probable / punto de cambio
+               Análisis técnico contra el código actual.
+
+               ### Enfoque de solución propuesto
+               Pasos concretos, mencionando funciones y constantes reales.
+
+               ### Riesgos / estado compartido a revisar
+               Variables globales de game.js que se leen o escriben.
+
+               ### Criterios de aceptación
+               - [ ] verificable jugando en el navegador
+
+               ### Información faltante
+               Preguntas al autor si el issue es ambiguo (o "ninguna").
+               ```
+
+               Antes de comentar, busca si ya existe un comentario propio con el marcador
+               `<!-- claude-triage -->`:
+               `gh api repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/comments --jq '.[] | select(.body | startswith("<!-- claude-triage -->")) | .id'`
+               - Si existe un id, actualízalo (no crees uno nuevo):
+                 `gh api --method PATCH repos/${{ github.repository }}/issues/comments/<id> -f body=@- <<< "..."`
+               - Si no existe, créalo:
+                 `gh issue comment ${{ github.event.issue.number }} --body "..."`
+
+            ## Restricciones
+            - No modifiques ningún archivo de código ni crees ramas o PRs.
+            - No cierres el issue ni cambies su estado.
+            - Responde siempre en español, consistente con el resto del repo.
