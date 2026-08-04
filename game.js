@@ -32,6 +32,171 @@ const NUT_TYPE = 8;
 
 const LINE_SCORES = [0, 100, 300, 500, 800];
 
+// ---- Skins visuales ----
+// Cada skin define su propia paleta de colores y sus funciones de dibujo
+// para el bloque relleno y el agujero de la pieza "Tuerca".
+const SKINS = {
+  retro: {
+    colors: [
+      null,
+      '#4dd0e1', // I - cyan
+      '#ffd54f', // O - yellow
+      '#ba68c8', // T - purple
+      '#81c784', // S - green
+      '#e57373', // Z - red
+      '#90caf9', // J - azul pálido
+      '#ffb74d', // L - orange
+      '#b0bec5', // Tuerca - gris metálico
+    ],
+    gridColor: null, // usa el color de rejilla del tema claro/oscuro
+    drawBlock(context, x, y, colorIndex, size, alpha) {
+      if (!colorIndex) return;
+      const color = this.colors[colorIndex];
+      context.globalAlpha = alpha ?? 1;
+      context.fillStyle = color;
+      context.fillRect(x * size + 1, y * size + 1, size - 2, size - 2);
+      // highlight
+      context.fillStyle = 'rgba(255,255,255,0.12)';
+      context.fillRect(x * size + 1, y * size + 1, size - 2, 4);
+      context.globalAlpha = 1;
+    },
+    drawNutHole(context, x, y, size, alpha) {
+      context.globalAlpha = alpha ?? 1;
+      context.strokeStyle = this.colors[NUT_TYPE];
+      context.lineWidth = Math.max(2, size * 0.09);
+      context.beginPath();
+      context.arc(x * size + size / 2, y * size + size / 2, size * 0.34, 0, Math.PI * 2);
+      context.stroke();
+      context.globalAlpha = 1;
+    },
+  },
+  neon: {
+    colors: [
+      null,
+      '#00e5ff', // I
+      '#ffea00', // O
+      '#e040fb', // T
+      '#00e676', // S
+      '#ff1744', // Z
+      '#40c4ff', // J
+      '#ff9100', // L
+      '#eeeeee', // Tuerca
+    ],
+    gridColor: '#151522',
+    drawBlock(context, x, y, colorIndex, size, alpha) {
+      if (!colorIndex) return;
+      const color = this.colors[colorIndex];
+      context.globalAlpha = alpha ?? 1;
+      context.shadowBlur = 12;
+      context.shadowColor = color;
+      context.fillStyle = color;
+      context.fillRect(x * size + 2, y * size + 2, size - 4, size - 4);
+      // resetear el glow para que no contamine el resto del canvas
+      context.shadowBlur = 0;
+      context.globalAlpha = 1;
+    },
+    drawNutHole(context, x, y, size, alpha) {
+      context.globalAlpha = alpha ?? 1;
+      const color = this.colors[NUT_TYPE];
+      context.shadowBlur = 10;
+      context.shadowColor = color;
+      context.strokeStyle = color;
+      context.lineWidth = Math.max(2, size * 0.09);
+      context.beginPath();
+      context.arc(x * size + size / 2, y * size + size / 2, size * 0.34, 0, Math.PI * 2);
+      context.stroke();
+      context.shadowBlur = 0;
+      context.globalAlpha = 1;
+    },
+  },
+  pastel: {
+    colors: [
+      null,
+      '#a8e6ec', // I
+      '#fff3b0', // O
+      '#d9b8e6', // T
+      '#c1e8c1', // S
+      '#f4b8b8', // Z
+      '#c3dffc', // J
+      '#ffd9b3', // L
+      '#dde3e8', // Tuerca
+    ],
+    gridColor: null,
+    drawBlock(context, x, y, colorIndex, size, alpha) {
+      if (!colorIndex) return;
+      const color = this.colors[colorIndex];
+      const px = x * size + 1;
+      const py = y * size + 1;
+      const w = size - 2;
+      const h = size - 2;
+      const r = size * 0.22;
+      context.globalAlpha = alpha ?? 1;
+      context.fillStyle = color;
+      context.beginPath();
+      if (typeof context.roundRect === 'function') {
+        context.roundRect(px, py, w, h, r);
+      } else {
+        context.rect(px, py, w, h);
+      }
+      context.fill();
+      context.globalAlpha = 1;
+    },
+    drawNutHole(context, x, y, size, alpha) {
+      context.globalAlpha = alpha ?? 1;
+      context.strokeStyle = this.colors[NUT_TYPE];
+      context.lineWidth = Math.max(2, size * 0.09);
+      context.beginPath();
+      context.arc(x * size + size / 2, y * size + size / 2, size * 0.34, 0, Math.PI * 2);
+      context.stroke();
+      context.globalAlpha = 1;
+    },
+  },
+  pixel: {
+    colors: [
+      null,
+      '#4dd0e1', // I
+      '#ffd54f', // O
+      '#ba68c8', // T
+      '#81c784', // S
+      '#e57373', // Z
+      '#90caf9', // J
+      '#ffb74d', // L
+      '#b0bec5', // Tuerca
+    ],
+    gridColor: null,
+    drawBlock(context, x, y, colorIndex, size, alpha) {
+      if (!colorIndex) return;
+      const color = this.colors[colorIndex];
+      const px = x * size + 1;
+      const py = y * size + 1;
+      const w = size - 2;
+      const h = size - 2;
+      context.globalAlpha = alpha ?? 1;
+      context.fillStyle = color;
+      context.fillRect(px, py, w, h);
+      // textura de píxeles: sub-cuadrícula alternando tonos claros/oscuros
+      const sub = Math.max(2, Math.floor(size / 6));
+      for (let sy = 0; sy < h; sy += sub) {
+        for (let sx = 0; sx < w; sx += sub) {
+          const light = (Math.floor(sx / sub) + Math.floor(sy / sub)) % 2 === 0;
+          context.fillStyle = light ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.15)';
+          context.fillRect(px + sx, py + sy, Math.min(sub, w - sx), Math.min(sub, h - sy));
+        }
+      }
+      context.globalAlpha = 1;
+    },
+    drawNutHole(context, x, y, size, alpha) {
+      context.globalAlpha = alpha ?? 1;
+      context.strokeStyle = this.colors[NUT_TYPE];
+      context.lineWidth = Math.max(2, size * 0.09);
+      context.beginPath();
+      context.arc(x * size + size / 2, y * size + size / 2, size * 0.34, 0, Math.PI * 2);
+      context.stroke();
+      context.globalAlpha = 1;
+    },
+  },
+};
+
 const canvas = document.getElementById('board');
 const ctx = canvas.getContext('2d');
 const nextCanvas = document.getElementById('next-canvas');
@@ -44,11 +209,14 @@ const overlayTitle = document.getElementById('overlay-title');
 const overlayScore = document.getElementById('overlay-score');
 const restartBtn = document.getElementById('restart-btn');
 const themeToggle = document.getElementById('theme-toggle');
+const skinSelect = document.getElementById('skin-select');
 
 const THEME_STORAGE_KEY = 'tetris-theme';
+const SKIN_STORAGE_KEY = 'tetris-skin';
 
 let board, current, next, score, lines, level, paused, gameOver, lastTime, dropAccum, dropInterval, animId;
 let gridColor;
+let currentSkin;
 
 function createBoard() {
   return Array.from({ length: ROWS }, () => new Array(COLS).fill(0));
@@ -165,25 +333,11 @@ function updateHUD() {
 }
 
 function drawBlock(context, x, y, colorIndex, size, alpha) {
-  if (!colorIndex) return;
-  const color = COLORS[colorIndex];
-  context.globalAlpha = alpha ?? 1;
-  context.fillStyle = color;
-  context.fillRect(x * size + 1, y * size + 1, size - 2, size - 2);
-  // highlight
-  context.fillStyle = 'rgba(255,255,255,0.12)';
-  context.fillRect(x * size + 1, y * size + 1, size - 2, 4);
-  context.globalAlpha = 1;
+  currentSkin.drawBlock(context, x, y, colorIndex, size, alpha);
 }
 
 function drawNutHole(context, x, y, size, alpha) {
-  context.globalAlpha = alpha ?? 1;
-  context.strokeStyle = COLORS[NUT_TYPE];
-  context.lineWidth = Math.max(2, size * 0.09);
-  context.beginPath();
-  context.arc(x * size + size / 2, y * size + size / 2, size * 0.34, 0, Math.PI * 2);
-  context.stroke();
-  context.globalAlpha = 1;
+  currentSkin.drawNutHole(context, x, y, size, alpha);
 }
 
 function applyTheme(theme) {
@@ -193,8 +347,15 @@ function applyTheme(theme) {
   localStorage.setItem(THEME_STORAGE_KEY, theme);
 }
 
+function applySkin(skin) {
+  currentSkin = SKINS[skin] || SKINS.retro;
+  document.body.classList.toggle('skin-neon', currentSkin === SKINS.neon);
+  skinSelect.value = skin;
+  localStorage.setItem(SKIN_STORAGE_KEY, skin);
+}
+
 function drawGrid() {
-  ctx.strokeStyle = gridColor;
+  ctx.strokeStyle = currentSkin.gridColor || gridColor;
   ctx.lineWidth = 0.5;
   for (let c = 1; c < COLS; c++) {
     ctx.beginPath();
@@ -335,5 +496,12 @@ themeToggle.addEventListener('change', () => {
   applyTheme(themeToggle.checked ? 'light' : 'dark');
 });
 
+skinSelect.addEventListener('change', () => {
+  applySkin(skinSelect.value);
+  draw();
+  drawNext();
+});
+
 applyTheme(localStorage.getItem(THEME_STORAGE_KEY) === 'light' ? 'light' : 'dark');
+applySkin(localStorage.getItem(SKIN_STORAGE_KEY) || 'retro');
 init();
