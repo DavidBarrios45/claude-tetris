@@ -208,6 +208,7 @@ const overlay = document.getElementById('overlay');
 const overlayTitle = document.getElementById('overlay-title');
 const overlayScore = document.getElementById('overlay-score');
 const restartBtn = document.getElementById('restart-btn');
+const gameoverBox = document.getElementById('gameover-box');
 const themeToggle = document.getElementById('theme-toggle');
 const skinSelect = document.getElementById('skin-select');
 
@@ -223,15 +224,24 @@ const nameEntry = document.getElementById('name-entry');
 const nameInput = document.getElementById('name-input');
 const saveScoreBtn = document.getElementById('save-score-btn');
 
+const pauseMenu = document.getElementById('pause-menu');
+const resumeBtn = document.getElementById('resume-btn');
+const pauseRestartBtn = document.getElementById('pause-restart-btn');
+const controlsToggleBtn = document.getElementById('controls-toggle-btn');
+const pauseControlsList = document.getElementById('pause-controls-list');
+const startLevelSelect = document.getElementById('start-level');
+
 const THEME_STORAGE_KEY = 'tetris-theme';
 const SKIN_STORAGE_KEY = 'tetris-skin';
 const HIGHSCORES_STORAGE_KEY = 'tetris-highscores';
+const START_LEVEL_STORAGE_KEY = 'tetris-start-level';
 
 let board, current, next, score, lines, level, paused, gameOver, lastTime, dropAccum, dropInterval, animId;
 let gridColor;
 let currentSkin;
 let combo, maxCombo;
 let saveScoreHandler = null;
+let startLevel;
 
 function createBoard() {
   return Array.from({ length: ROWS }, () => new Array(COLS).fill(0));
@@ -297,7 +307,7 @@ function clearLines() {
   if (cleared) {
     lines += cleared;
     score += (LINE_SCORES[cleared] || 0) * level;
-    level = Math.floor(lines / 10) + 1;
+    level = startLevel + Math.floor(lines / 10);
     dropInterval = Math.max(100, 1000 - (level - 1) * 90);
     updateHUD();
   }
@@ -562,12 +572,22 @@ function togglePause() {
   if (gameOver) return;
   paused = !paused;
   if (!paused) {
+    // Al reanudar: ocultar overlay y menú de pausa, restaurar el bloque de
+    // game over por si quedó oculto de una pausa previa, y quitar el foco
+    // de cualquier botón para evitar reactivaciones accidentales con Space/Enter.
+    overlay.classList.add('hidden');
+    pauseMenu.classList.add('hidden');
+    pauseControlsList.classList.add('hidden');
+    gameoverBox.classList.remove('hidden');
+    if (document.activeElement && document.activeElement.blur) {
+      document.activeElement.blur();
+    }
     lastTime = performance.now();
     loop(lastTime);
   } else {
     cancelAnimationFrame(animId);
-    overlayTitle.textContent = 'PAUSA';
-    overlayScore.textContent = '';
+    gameoverBox.classList.add('hidden');
+    pauseMenu.classList.remove('hidden');
     overlay.classList.remove('hidden');
   }
 }
@@ -590,16 +610,23 @@ function loop(ts) {
   animId = requestAnimationFrame(loop);
 }
 
+function readStartLevel() {
+  const stored = parseInt(localStorage.getItem(START_LEVEL_STORAGE_KEY), 10);
+  if (Number.isInteger(stored) && stored >= 1 && stored <= 15) return stored;
+  return 1;
+}
+
 function init() {
   board = createBoard();
   score = 0;
   lines = 0;
-  level = 1;
+  startLevel = readStartLevel();
+  level = startLevel;
   combo = 0;
   maxCombo = 0;
   paused = false;
   gameOver = false;
-  dropInterval = 1000;
+  dropInterval = Math.max(100, 1000 - (level - 1) * 90);
   dropAccum = 0;
   lastTime = performance.now();
   next = randomPiece();
@@ -613,13 +640,28 @@ function init() {
   gameoverScores.innerHTML = '';
   startScreen.classList.add('hidden');
   overlay.classList.add('hidden');
+  pauseMenu.classList.add('hidden');
+  pauseControlsList.classList.add('hidden');
+  gameoverBox.classList.remove('hidden');
+  startLevelSelect.value = String(startLevel);
   cancelAnimationFrame(animId);
   animId = requestAnimationFrame(loop);
 }
 
+const SCROLL_KEYS = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Space'];
+
 document.addEventListener('keydown', e => {
-  if (e.code === 'KeyP') { togglePause(); return; }
-  if (paused || gameOver) return;
+  if (e.code === 'KeyP' || e.code === 'Escape') { togglePause(); return; }
+  if (paused || gameOver) {
+    // Evita que las flechas/Space hagan scroll de página mientras el
+    // menú de pausa (u overlay de game over) está abierto, salvo que el
+    // foco esté en un control interactivo (select/botón) que las necesite
+    // para su propia navegación con teclado.
+    const tag = document.activeElement && document.activeElement.tagName;
+    const isInteractiveControl = tag === 'SELECT' || tag === 'BUTTON' || tag === 'INPUT';
+    if (SCROLL_KEYS.includes(e.code) && !isInteractiveControl) e.preventDefault();
+    return;
+  }
   switch (e.code) {
     case 'ArrowLeft':
       if (!collide(current.shape, current.x - 1, current.y)) current.x--;
@@ -663,6 +705,25 @@ skinSelect.addEventListener('change', () => {
   applySkin(skinSelect.value);
   draw();
   drawNext();
+});
+
+resumeBtn.addEventListener('click', () => {
+  if (paused) togglePause();
+});
+
+pauseRestartBtn.addEventListener('click', () => {
+  init();
+});
+
+controlsToggleBtn.addEventListener('click', () => {
+  pauseControlsList.classList.toggle('hidden');
+});
+
+startLevelSelect.addEventListener('change', () => {
+  const value = parseInt(startLevelSelect.value, 10);
+  if (Number.isInteger(value) && value >= 1 && value <= 15) {
+    localStorage.setItem(START_LEVEL_STORAGE_KEY, String(value));
+  }
 });
 
 applyTheme(localStorage.getItem(THEME_STORAGE_KEY) === 'light' ? 'light' : 'dark');
