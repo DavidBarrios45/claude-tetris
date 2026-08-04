@@ -161,6 +161,31 @@ body {
   transform: translateX(20px);
 }
 
+/* ---- Selector de skin ---- */
+.skin-section {
+  gap: 8px;
+}
+
+#skin-select {
+  background: var(--kbd-bg);
+  border: 1px solid var(--kbd-border);
+  border-radius: 4px;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 12px;
+  padding: 4px 6px;
+  cursor: pointer;
+}
+
+/* ---- Skin Neon: fondo negro del tablero ---- */
+:root {
+  --board-bg-neon: #000000;
+}
+
+body.skin-neon #board {
+  background: var(--board-bg-neon);
+}
+
 /* ---- Controles ---- */
 .controls ul {
   list-style: none;
