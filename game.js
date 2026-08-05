@@ -53,15 +53,26 @@ const scoreboardList = document.getElementById('scoreboard-list');
 const bestComboValueEl = document.getElementById('best-combo-value');
 const maxLinesValueEl = document.getElementById('max-lines-value');
 const resetRecordsBtn = document.getElementById('reset-records-btn');
+const gameoverBox = document.getElementById('gameover-box');
+const pauseBox = document.getElementById('pause-box');
+const pauseViewMain = document.getElementById('pause-view-main');
+const pauseViewControls = document.getElementById('pause-view-controls');
+const resumeBtn = document.getElementById('resume-btn');
+const pauseRestartBtn = document.getElementById('pause-restart-btn');
+const showControlsBtn = document.getElementById('show-controls-btn');
+const backBtn = document.getElementById('back-btn');
+const startLevelSelect = document.getElementById('start-level-select');
 
 const THEME_STORAGE_KEY = 'tetris-theme';
 const SCORES_STORAGE_KEY = 'tetris-highscores';
 const STATS_STORAGE_KEY = 'tetris-stats';
 const MAX_SCORES = 5;
+const START_LEVEL_STORAGE_KEY = 'tetris-start-level';
 
 let board, current, next, score, lines, level, paused, gameOver, lastTime, dropAccum, dropInterval, animId;
 let gridColor;
 let combo, bestCombo;
+let startLevel = 1;
 
 function createBoard() {
   return Array.from({ length: ROWS }, () => new Array(COLS).fill(0));
@@ -337,6 +348,8 @@ let pendingEntry = null;
 function endGame() {
   gameOver = true;
   cancelAnimationFrame(animId);
+  pauseBox.classList.add('hidden');
+  gameoverBox.classList.remove('hidden');
   overlayTitle.textContent = 'GAME OVER';
   overlayScore.textContent = `Puntuación: ${score.toLocaleString()}`;
   overlayStats.textContent = `Combo: ${bestCombo} · Líneas: ${lines}`;
@@ -378,20 +391,29 @@ function submitScore() {
   pendingEntry = null;
 }
 
+function showPauseMenu() {
+  gameoverBox.classList.add('hidden');
+  pauseBox.classList.remove('hidden');
+  pauseViewControls.classList.add('hidden');
+  pauseViewMain.classList.remove('hidden');
+  overlay.classList.remove('hidden');
+}
+
+function hidePauseMenu() {
+  pauseBox.classList.add('hidden');
+  overlay.classList.add('hidden');
+}
+
 function togglePause() {
   if (gameOver) return;
   paused = !paused;
   if (!paused) {
+    hidePauseMenu();
     lastTime = performance.now();
     loop(lastTime);
   } else {
     cancelAnimationFrame(animId);
-    overlayTitle.textContent = 'PAUSA';
-    overlayScore.textContent = '';
-    overlayStats.textContent = '';
-    newRecordForm.classList.add('hidden');
-    overlayScoreboard.innerHTML = '';
-    overlay.classList.remove('hidden');
+    showPauseMenu();
   }
 }
 
@@ -417,17 +439,19 @@ function init() {
   board = createBoard();
   score = 0;
   lines = 0;
-  level = 1;
+  level = startLevel;
   combo = 0;
   bestCombo = 0;
   paused = false;
   gameOver = false;
-  dropInterval = 1000;
+  dropInterval = Math.max(100, 1000 - (level - 1) * 90);
   dropAccum = 0;
   lastTime = performance.now();
   next = randomPiece();
   spawn();
   updateHUD();
+  gameoverBox.classList.remove('hidden');
+  pauseBox.classList.add('hidden');
   overlay.classList.add('hidden');
   newRecordForm.classList.add('hidden');
   cancelAnimationFrame(animId);
@@ -435,7 +459,7 @@ function init() {
 }
 
 document.addEventListener('keydown', e => {
-  if (e.code === 'KeyP') { togglePause(); return; }
+  if (e.code === 'KeyP' || e.code === 'Escape') { togglePause(); return; }
   if (paused || gameOver) return;
   switch (e.code) {
     case 'ArrowLeft':
@@ -461,6 +485,27 @@ document.addEventListener('keydown', e => {
 
 restartBtn.addEventListener('click', init);
 
+resumeBtn.addEventListener('click', togglePause);
+
+pauseRestartBtn.addEventListener('click', () => {
+  init();
+});
+
+showControlsBtn.addEventListener('click', () => {
+  pauseViewMain.classList.add('hidden');
+  pauseViewControls.classList.remove('hidden');
+});
+
+backBtn.addEventListener('click', () => {
+  pauseViewControls.classList.add('hidden');
+  pauseViewMain.classList.remove('hidden');
+});
+
+startLevelSelect.addEventListener('change', () => {
+  startLevel = parseInt(startLevelSelect.value, 10);
+  localStorage.setItem(START_LEVEL_STORAGE_KEY, String(startLevel));
+});
+
 themeToggle.addEventListener('change', () => {
   applyTheme(themeToggle.checked ? 'light' : 'dark');
 });
@@ -475,4 +520,6 @@ resetRecordsBtn.addEventListener('click', () => {
 
 applyTheme(localStorage.getItem(THEME_STORAGE_KEY) === 'light' ? 'light' : 'dark');
 refreshRecordsPanel();
+startLevel = parseInt(localStorage.getItem(START_LEVEL_STORAGE_KEY), 10) || 1;
+startLevelSelect.value = String(startLevel);
 init();
