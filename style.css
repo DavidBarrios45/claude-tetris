@@ -241,3 +241,125 @@ kbd {
 #restart-btn:hover {
   background: var(--restart-hover-bg);
 }
+
+/* ---- Records / scoreboard ---- */
+.records-section {
+  font-size: 12px;
+}
+
+.scoreboard-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 12px;
+  color: var(--controls-color);
+  counter-reset: rank;
+}
+
+.scoreboard-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  counter-increment: rank;
+}
+
+.scoreboard-list li::before {
+  content: counter(rank) ".";
+  color: var(--label-color);
+  min-width: 14px;
+}
+
+.scoreboard-list li.highlight {
+  color: var(--value-color);
+  font-weight: 700;
+}
+
+.scoreboard-list .rank-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stats-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 11px;
+  color: var(--controls-color);
+  margin-top: 4px;
+}
+
+.reset-btn {
+  margin-top: 6px;
+  background: transparent;
+  color: var(--controls-color);
+  border: 1px solid var(--kbd-border);
+  border-radius: 4px;
+  padding: 5px 8px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.reset-btn:hover {
+  border-color: var(--value-color);
+  color: var(--value-color);
+}
+
+#overlay-stats {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 12px;
+  color: var(--controls-color);
+}
+
+.new-record-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+}
+
+.new-record-form.hidden {
+  display: none;
+}
+
+.new-record-label {
+  font-size: 12px;
+  color: var(--overlay-title-color);
+  font-weight: 700;
+}
+
+#player-name-input {
+  font-family: inherit;
+  font-size: 14px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--kbd-border);
+  background: var(--kbd-bg);
+  color: var(--text);
+  text-align: center;
+  width: 140px;
+}
+
+#save-score-btn {
+  background: var(--restart-bg);
+  color: var(--restart-color);
+  border: none;
+  border-radius: 6px;
+  padding: 8px 20px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+#save-score-btn:hover {
+  background: var(--restart-hover-bg);
+}
+
+#overlay-scoreboard {
+  width: 220px;
+}
